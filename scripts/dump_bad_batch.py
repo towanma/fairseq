@@ -29,6 +29,12 @@ def load_manifest_paths(manifest_path: str) -> List[str]:
 
 def main(args: argparse.Namespace) -> None:
     cfg = OmegaConf.load(os.path.join(args.run_dir, ".hydra", "config.yaml"))
+    OmegaConf.resolve(cfg)
+
+    if isinstance(cfg.task.label_rate, int):
+        cfg.task.label_rate = float(cfg.task.label_rate)
+    elif isinstance(cfg.task.label_rate, str):
+        cfg.task.label_rate = float(cfg.task.label_rate)
     task = tasks.setup_task(cfg.task)
 
     split = args.split
@@ -38,36 +44,50 @@ def main(args: argparse.Namespace) -> None:
     manifest_path = os.path.join(cfg.task.data, f"{split}.tsv")
     sample_paths = load_manifest_paths(manifest_path)
 
-    itr = task.get_batch_iterator(
-        dataset=dataset,
-        max_tokens=cfg.dataset.max_tokens,
-        max_sentences=cfg.dataset.max_sentences,
-        max_positions=task.max_positions(),
-        seed=cfg.common.seed,
-        epoch=args.epoch,
-        shuffle=True,
-        num_shards=1,
-        shard_id=0,
-    ).next_epoch_itr(shuffle=True)
-
-    if cfg.optimization.update_freq:
-        update_period = cfg.optimization.update_freq[0]
-    else:
-        update_period = 1
+    update_freq = cfg.optimization.update_freq or [1]
+    update_period = update_freq[0]
 
     target_update = args.target_update
-    for step, sample in enumerate(itr, start=1):
-        if step == target_update * update_period:
-            ids = sample["id"].cpu().tolist()
-            print(f"Found batch for update {target_update} (epoch {args.epoch})")
-            for idx in ids:
-                print(sample_paths[idx])
+    global_update = 0
+
+    for epoch in range(1, args.epoch + 1):
+        epoch_itr = task.get_batch_iterator(
+            dataset=dataset,
+            max_tokens=cfg.dataset.max_tokens,
+            max_sentences=cfg.dataset.max_sentences,
+            max_positions=task.max_positions(),
+            seed=cfg.common.seed,
+            epoch=epoch,
+            shuffle=True,
+            num_shards=1,
+            shard_id=0,
+        ).next_epoch_itr(shuffle=True)
+
+        micro_batches: List[List[int]] = []
+        for sample in epoch_itr:
+            sample_ids = sample["id"].cpu().tolist()
+            micro_batches.append(sample_ids)
+
+            if len(micro_batches) == update_period:
+                global_update += 1
+                if global_update == target_update:
+                    print(
+                        f"Found optimizer update {target_update} "
+                        f"during epoch {epoch} (micro-batches {len(micro_batches)})"
+                    )
+                    ids_to_report = [idx for mb in micro_batches for idx in mb]
+                    for idx in ids_to_report:
+                        print(sample_paths[idx])
+                    return
+                micro_batches = []
+
+        if global_update >= target_update:
             break
-    else:
-        raise ValueError(
-            f"Reached end of iterator without finding update {target_update}. "
-            "Check epoch/update numbers or override --epoch."
-        )
+
+    raise ValueError(
+        f"Could not locate update {target_update}. "
+        "Check that --epoch is at least as large as the epoch containing the target update."
+    )
 
 
 def parse_args() -> argparse.Namespace:
