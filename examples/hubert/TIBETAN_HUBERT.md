@@ -245,5 +245,13 @@ for i in $(seq 0 499); do echo "$i 1"; done > ${LABEL_STAGE3}/dict.km.txt
 - **label_rate 设置**：MFCC 生成的标签默认 100Hz，若在 HuBERT 特征提取时修改 `--layer` 或 `--max_chunk` 影响帧率，请相应调整 `model.label_rate`。  
 - **多机多卡**：可使用 `torchrun --nnodes=N --node_rank=i --master_addr=...` 等参数；确保 `distributed_world_size = N * nproc_per_node`。  
 - **磁盘清理**：分片特征和中间 KM 标签体积大，建议阶段完成后压缩或删除旧版文件，避免混淆。
+- **定位异常 batch**：若 loss 突然飙升，可运行脚本恢复对应样本：
+  ```bash
+  python scripts/dump_bad_batch.py \
+    --run-dir /root/fairseq/outputs/2025-10-21/19-30-00 \
+    --target-update 36213 \
+    --epoch 568
+  ```
+  该脚本读取 Hydra 保存的 `.hydra/config.yaml`，根据日志中的 `num_updates` 与 `epoch` 输出同批次音频的完整路径，可选 `--split` 指定数据集（默认 `train`），便于人工排查异常样本。
 
 遵循以上流程即可完成藏语 HuBERT 的多阶段继续预训练，并为后续的 ASR、关键词检索等任务提供高质量音频表征。祝实验顺利！
