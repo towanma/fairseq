@@ -67,7 +67,6 @@ def main(args: argparse.Namespace) -> None:
             max_positions=task.max_positions(),
             seed=cfg.common.seed,
             epoch=epoch,
-            shuffle=True,
             num_shards=1,
             shard_id=0,
         ).next_epoch_itr(shuffle=True)
