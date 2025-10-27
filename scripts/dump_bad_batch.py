@@ -29,12 +29,21 @@ def load_manifest_paths(manifest_path: str) -> List[str]:
 
 def main(args: argparse.Namespace) -> None:
     cfg = OmegaConf.load(os.path.join(args.run_dir, ".hydra", "config.yaml"))
-    OmegaConf.resolve(cfg)
 
-    if isinstance(cfg.task.label_rate, int):
-        cfg.task.label_rate = float(cfg.task.label_rate)
-    elif isinstance(cfg.task.label_rate, str):
-        cfg.task.label_rate = float(cfg.task.label_rate)
+    label_rate = cfg.task.label_rate
+    if isinstance(label_rate, (int, float)):
+        cfg.task.label_rate = float(label_rate)
+    elif isinstance(label_rate, str):
+        if label_rate.startswith("${") and label_rate.endswith("}"):
+            target = label_rate[2:-1]
+            resolved = OmegaConf.select(cfg, target)
+            if resolved is None:
+                raise ValueError(f"Unable to resolve label_rate reference: {label_rate}")
+            cfg.task.label_rate = float(resolved)
+        else:
+            cfg.task.label_rate = float(label_rate)
+    else:
+        raise ValueError(f"Unsupported label_rate type: {type(label_rate)}")
     task = tasks.setup_task(cfg.task)
 
     split = args.split
