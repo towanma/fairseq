@@ -162,7 +162,8 @@ class HubertPipeline:
         logger.info(f"{'='*60}")
 
         stage1_config = self.stages_config.get("stage1", {})
-        nshard = stage1_config.get("nshard", 100)
+        #nshard 用来设置多机数据处理，单机1就可以
+        nshard = stage1_config.get("nshard", 1)
         feat_dir = self.work_dir / "stage1" / "mfcc_feat"
         feat_dir.mkdir(parents=True, exist_ok=True)
 
