@@ -247,7 +247,7 @@ for i in $(seq 0 499); do echo "$i 1"; done > ${LABEL_STAGE3}/dict.km.txt
 - **磁盘清理**：分片特征和中间 KM 标签体积大，建议阶段完成后压缩或删除旧版文件，避免混淆。
 - **定位异常 batch**：若 loss 突然飙升，可运行脚本恢复对应样本：
   ```bash
-  python scripts/dump_bad_batch.py \
+  python examples/hubert/tib_hubert/scripts/dump_bad_batch.py \
     --run-dir /root/fairseq/outputs/2025-10-21/19-30-00 \
     --target-update 36213 \
     --epoch 568

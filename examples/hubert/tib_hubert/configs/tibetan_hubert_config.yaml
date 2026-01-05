@@ -1,0 +1,95 @@
+# Tibetan HuBERT Training Configuration
+# This configuration file controls the entire training pipeline
+
+# Data configuration
+data:
+  # Directory containing train.tsv, valid.tsv, test.tsv
+  manifest_dir: /data/tibetan_manifest
+
+  # Working directory for intermediate files and checkpoints
+  work_dir: /data/tibetan_hubert_work
+
+  # Audio sample rate (Hz)
+  sample_rate: 16000
+
+  # Whether you have a separate test split
+  has_test_split: true
+
+  # Data validation parameters
+  validation:
+    num_workers: 8
+    min_duration: 2.0      # Minimum audio duration in seconds (32000 frames at 16kHz)
+    max_duration: 15.625   # Maximum audio duration in seconds (250000 frames at 16kHz)
+    skip_mfcc_check: false # Set to true for faster validation (but less thorough)
+
+# Training configuration
+training:
+  # Number of GPUs to use
+  distributed_world_size: 2
+
+  # GPUs per node (usually same as distributed_world_size for single machine)
+  nproc_per_node: 2
+
+  # Master port for distributed training
+  master_port: 29501
+
+# Stage-specific configuration
+stages:
+  # Stage 1: MFCC-based training
+  stage1:
+    # Number of shards for parallel feature extraction
+    nshard: 100
+
+    # Number of K-means clusters (100 is recommended for stage 1)
+    n_clusters: 100
+
+    # Percentage of data to use for K-means fitting (-1 for all data)
+    percent: 0.1
+
+    # Layer to extract features from (not used in stage 1, only MFCC)
+    layer: null
+
+    # Training overrides (optional)
+    train_overrides:
+      optimization.max_update: 100000
+      dataset.max_tokens: 1400000
+      common.fp16: true
+      optimization.clip_norm: 10.0
+      # Add gradient clipping to prevent NaN
+      optimization.clip_norm_type: l2
+      # Enable better NaN detection
+      common.log_interval: 100
+      # Validation settings
+      dataset.validate_interval: 1
+      dataset.validate_interval_updates: 5000
+
+  # Stage 2: HuBERT L6 feature training
+  stage2:
+    nshard: 100
+    n_clusters: 500  # Increase to 500 for stage 2
+    percent: 0.1
+    layer: 6  # Extract from layer 6 of stage 1 model
+
+    train_overrides:
+      optimization.max_update: 100000
+      dataset.max_tokens: 1400000
+      common.fp16: true
+      optimization.clip_norm: 10.0
+      optimization.clip_norm_type: l2
+      common.log_interval: 100
+      dataset.validate_interval: 1
+      dataset.validate_interval_updates: 5000
+
+  # Stage 3 (optional): HuBERT L9 feature training
+  stage3:
+    enabled: false  # Set to true to enable stage 3
+    nshard: 100
+    n_clusters: 500
+    percent: 0.1
+    layer: 9
+
+    train_overrides:
+      optimization.max_update: 100000
+      dataset.max_tokens: 1400000
+      common.fp16: true
+      optimization.clip_norm: 10.0
