@@ -194,7 +194,7 @@ class HubertPipeline:
         logger.info(f"{'='*60}")
 
         stage1_config = self.stages_config.get("stage1", {})
-        nshard = stage1_config.get("nshard", 100)
+        nshard = stage1_config.get("nshard", 1)
         n_clusters = stage1_config.get("n_clusters", 100)
         percent = stage1_config.get("percent", 0.1)
 
@@ -222,7 +222,7 @@ class HubertPipeline:
         logger.info(f"{'='*60}")
 
         stage1_config = self.stages_config.get("stage1", {})
-        nshard = stage1_config.get("nshard", 100)
+        nshard = stage1_config.get("nshard", 1)
         n_clusters = stage1_config.get("n_clusters", 100)
 
         feat_dir = self.work_dir / "stage1" / "mfcc_feat"
@@ -334,7 +334,7 @@ class HubertPipeline:
         logger.info(f"{'='*60}")
 
         stage2_config = self.stages_config.get("stage2", {})
-        nshard = stage2_config.get("nshard", 100)
+        nshard = stage2_config.get("nshard", 1)
         layer = stage2_config.get("layer", 6)
 
         stage1_ckpt = self.work_dir / "stage1" / "checkpoints" / "checkpoint_best.pt"
@@ -376,7 +376,7 @@ class HubertPipeline:
         logger.info(f"{'='*60}")
 
         stage2_config = self.stages_config.get("stage2", {})
-        nshard = stage2_config.get("nshard", 100)
+        nshard = stage2_config.get("nshard", 1)
         n_clusters = stage2_config.get("n_clusters", 500)
         percent = stage2_config.get("percent", 0.1)
 
@@ -404,7 +404,7 @@ class HubertPipeline:
         logger.info(f"{'='*60}")
 
         stage2_config = self.stages_config.get("stage2", {})
-        nshard = stage2_config.get("nshard", 100)
+        nshard = stage2_config.get("nshard", 1)
         n_clusters = stage2_config.get("n_clusters", 500)
 
         feat_dir = self.work_dir / "stage2" / "features"
