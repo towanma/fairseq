@@ -13,7 +13,9 @@ data:
   sample_rate: 16000
 
   # Whether you have a separate test split
-  has_test_split: true
+  # If true, pipeline will try to process test.tsv when it exists.
+  # If test.tsv is missing, the pipeline will warn and skip the test split.
+  has_test_split: false
 
   # Data validation parameters
   validation:
@@ -93,3 +95,7 @@ stages:
       dataset.max_tokens: 1400000
       common.fp16: true
       optimization.clip_norm: 10.0
+      optimization.clip_norm_type: l2
+      common.log_interval: 100
+      dataset.validate_interval: 1
+      dataset.validate_interval_updates: 5000

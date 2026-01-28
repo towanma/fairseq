@@ -304,27 +304,27 @@ def main():
 
     # Validate files in parallel
     logger.info(f"Validating {len(tasks)} files with {args.num_workers} workers...")
-    results = []
+    # Keep results aligned with the original manifest order. This is important because
+    # we later filter `entries` by index.
+    results: List[Optional[AudioValidationResult]] = [None] * len(tasks)
+    valid_so_far = 0
 
     with ProcessPoolExecutor(max_workers=args.num_workers) as executor:
         futures = {executor.submit(validate_single_file, task): i for i, task in enumerate(tasks)}
 
-        for i, future in enumerate(as_completed(futures), 1):
+        for done, future in enumerate(as_completed(futures), 1):
+            idx = futures[future]
             result = future.result()
-            results.append(result)
+            results[idx] = result
+            if result.valid:
+                valid_so_far += 1
 
-            if i % 100 == 0:
-                valid_count = sum(1 for r in results if r.valid)
-                logger.info(f"Progress: {i}/{len(tasks)} ({valid_count} valid)")
+            if done % 100 == 0:
+                logger.info(f"Progress: {done}/{len(tasks)} ({valid_so_far} valid)")
 
-    # Sort results by original order
-    # Build a mapping from future to original index, then sort results
-    future_to_idx = {f: futures[f] for f in futures}
-    sorted_results = [None] * len(tasks)
-    for future in futures:
-        idx = future_to_idx[future]
-        sorted_results[idx] = results[list(futures.keys()).index(future)]
-    results = sorted_results
+    # Sanity: every task should have produced a result.
+    assert all(r is not None for r in results)
+    results = [r for r in results if r is not None]
 
     # Analyze results
     valid_results = [r for r in results if r.valid]

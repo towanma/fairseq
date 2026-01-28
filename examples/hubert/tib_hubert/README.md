@@ -198,6 +198,7 @@ python examples/hubert/tib_hubert/scripts/tibetan_hubert_pipeline.py \
 1. **数据验证** - 过滤问题音频
 2. **Stage 1** - MFCC 特征 → K-means → 训练
 3. **Stage 2** - HuBERT L6 特征 → K-means → 训练
+4. **Stage 3（可选）** - HuBERT 更高层特征（默认 L9）→ K-means → 训练（需在配置中开启）
 
 ### 4.2 分阶段运行
 
@@ -211,6 +212,11 @@ python examples/hubert/tib_hubert/scripts/tibetan_hubert_pipeline.py \
 python examples/hubert/tib_hubert/scripts/tibetan_hubert_pipeline.py \
     --config my_config.yaml \
     --stage stage2
+
+# 只运行第三阶段（需在配置中设置 stages.stage3.enabled=true）
+python examples/hubert/tib_hubert/scripts/tibetan_hubert_pipeline.py \
+    --config my_config.yaml \
+    --stage stage3
 
 # 只运行数据验证
 python examples/hubert/tib_hubert/scripts/tibetan_hubert_pipeline.py \
@@ -243,7 +249,7 @@ python examples/hubert/tib_hubert/scripts/tibetan_hubert_pipeline.py \
 | 参数 | 说明 |
 |------|------|
 | `--config` | 配置文件路径 |
-| `--stage` | 运行阶段：`all`, `validate`, `stage1`, `stage2` |
+| `--stage` | 运行阶段：`all`, `validate`, `stage1`, `stage2`, `stage3`（stage3 需开启） |
 | `--resume` | 恢复运行，跳过已完成阶段 |
 | `--reset-state` | 清除状态，重新开始 |
 | `--skip-validation` | 跳过数据验证（不推荐） |
@@ -289,6 +295,7 @@ python examples/hubert/tib_hubert/scripts/monitor_training.py \
        --target-update 36213 \
        --epoch 568
    ```
+   - 多卡训练时，可尝试补充 `--num-shards <GPU数> --shard-id <0..GPU数-1>` 来匹配某个 rank 的数据分片。
 
 2. **检查并移除问题文件**，重新运行数据验证
 
@@ -345,10 +352,14 @@ dataset:
     │   ├── mfcc_feat/       # MFCC 特征
     │   ├── labels/          # 聚类标签
     │   └── checkpoints/     # 模型检查点
-    └── stage2/
+    ├── stage2/
         ├── features/        # HuBERT 特征
         ├── labels/
-        └── checkpoints/     # 最终模型
+        └── checkpoints/
+    └── stage3/              # 可选（需开启）
+        ├── features/
+        ├── labels/
+        └── checkpoints/     # 可选最终模型
 ```
 
 ---
@@ -358,6 +369,8 @@ dataset:
 最终模型保存在：
 ```
 /data/tibetan_hubert_work/stage2/checkpoints/checkpoint_best.pt
+# 如果开启了 stage3：
+/data/tibetan_hubert_work/stage3/checkpoints/checkpoint_best.pt
 ```
 
 可用于：

@@ -54,12 +54,21 @@ def main(args: argparse.Namespace) -> None:
     sample_paths = load_manifest_paths(manifest_path)
 
     update_freq = cfg.optimization.update_freq or [1]
-    update_period = update_freq[0]
+    if isinstance(update_freq, (int, float)):
+        update_freq = [int(update_freq)]
+    else:
+        update_freq = [int(x) for x in update_freq]
+
+    num_shards = args.num_shards
+    if num_shards is None:
+        num_shards = int(getattr(cfg.distributed_training, "distributed_world_size", 1) or 1)
+    shard_id = int(args.shard_id)
 
     target_update = args.target_update
     global_update = 0
 
     for epoch in range(1, args.epoch + 1):
+        update_period = update_freq[epoch - 1] if len(update_freq) >= epoch else update_freq[-1]
         epoch_itr = task.get_batch_iterator(
             dataset=dataset,
             max_tokens=cfg.dataset.max_tokens,
@@ -67,8 +76,8 @@ def main(args: argparse.Namespace) -> None:
             max_positions=task.max_positions(),
             seed=cfg.common.seed,
             epoch=epoch,
-            num_shards=1,
-            shard_id=0,
+            num_shards=num_shards,
+            shard_id=shard_id,
         ).next_epoch_itr(shuffle=True)
 
         micro_batches: List[List[int]] = []
@@ -121,6 +130,21 @@ def parse_args() -> argparse.Namespace:
         "--split",
         default="train",
         help="Dataset split to inspect (default: train).",
+    )
+    parser.add_argument(
+        "--num-shards",
+        type=int,
+        default=None,
+        help=(
+            "Number of dataset shards (defaults to cfg.distributed_training.distributed_world_size, "
+            "or 1 if not set). Use this to match DDP sharding."
+        ),
+    )
+    parser.add_argument(
+        "--shard-id",
+        type=int,
+        default=0,
+        help="Shard id in [0, num-shards). Use this to match the worker rank that saw the anomaly.",
     )
     return parser.parse_args()
 

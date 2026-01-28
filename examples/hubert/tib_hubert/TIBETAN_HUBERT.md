@@ -198,6 +198,9 @@ CUDA_VISIBLE_DEVICES=0,1 torchrun \
 ## 4. 第三阶段：L9 表征聚类（可选）
 第三阶段参考官方 pipeline，从第二阶段模型第 9 层提特征并重新聚类。
 
+> 如果你使用本目录的自动化脚本 `scripts/tibetan_hubert_pipeline.py`，也可以通过在 YAML 中设置
+> `stages.stage3.enabled=true` 来启用 Stage 3，并用 `--stage stage3` 或 `--stage all` 运行。
+
 ```bash
 export STAGE2_CKPT=/data/hubert_stage2/exp/checkpoint_best.pt
 export HUBERT_FEAT3=/data/hubert_stage3/features
@@ -252,6 +255,9 @@ for i in $(seq 0 499); do echo "$i 1"; done > ${LABEL_STAGE3}/dict.km.txt
     --target-update 36213 \
     --epoch 568
   ```
+  - 如果训练是通过 `scripts/tibetan_hubert_pipeline.py` 启动的，`--run-dir` 一般就是
+    `<work_dir>/stageX/checkpoints`（该目录包含 `train.log` 与 `.hydra/config.yaml`）。
+  - 多卡训练时，可尝试补充 `--num-shards <GPU数> --shard-id <0..GPU数-1>` 来匹配某个 rank 的数据分片。
   该脚本读取 Hydra 保存的 `.hydra/config.yaml`，根据日志中的 `num_updates` 与 `epoch` 输出同批次音频的完整路径，可选 `--split` 指定数据集（默认 `train`），便于人工排查异常样本。
 
 遵循以上流程即可完成藏语 HuBERT 的多阶段继续预训练，并为后续的 ASR、关键词检索等任务提供高质量音频表征。祝实验顺利！

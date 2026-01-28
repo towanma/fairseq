@@ -18,7 +18,7 @@ Usage:
     python scripts/monitor_training.py \
         --log-dir /data/tibetan_hubert_work/stage1/checkpoints \
         --mode analyze \
-        --output report.html
+        --output /data/analysis
 """
 
 import argparse
@@ -53,6 +53,32 @@ class TrainingMonitor:
         self.log_dir = Path(log_dir)
         self.metrics = defaultdict(list)
         self.anomalies = []
+
+    def find_train_log(self) -> Optional[Path]:
+        """
+        Locate a train log file.
+
+        Accepts either:
+        - a direct file path (train.log)
+        - a directory that contains train.log
+        - a directory tree that contains one or more train.log files (returns newest)
+        """
+        p = self.log_dir
+        if p.is_file():
+            return p
+
+        if not p.exists():
+            return None
+
+        direct = p / "train.log"
+        if direct.exists():
+            return direct
+
+        logs = list(p.rglob("train.log"))
+        if not logs:
+            return None
+        logs.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        return logs[0]
 
     def parse_hydra_log(self, log_file: Path) -> List[Dict]:
         """Parse Hydra training log file (JSON format)."""
@@ -412,19 +438,21 @@ class TrainingMonitor:
 
     def analyze(self, output_dir: Optional[str] = None):
         """Analyze completed training and generate report."""
-        # Find log file
-        log_files = list(self.log_dir.glob("**/train.log"))
-
-        if not log_files:
-            logger.error(f"No train.log found in {self.log_dir}")
+        log_file = self.find_train_log()
+        if log_file is None:
+            logger.error(f"No train.log found under: {self.log_dir}")
+            logger.error("Tip: pass a Hydra run directory (contains train.log), or a path to train.log directly.")
             return
-
-        log_file = log_files[0]
         logger.info(f"Analyzing {log_file}")
 
         # Parse log
         entries = self.parse_hydra_log(log_file)
         logger.info(f"Parsed {len(entries)} log entries")
+        if len(entries) == 0:
+            logger.warning(
+                "No JSON entries parsed. Ensure fairseq is logging JSON lines "
+                "(e.g., common.log_format=json) and that the correct train.log is selected."
+            )
 
         # Extract metrics
         metrics = self.extract_metrics(entries)
@@ -442,7 +470,7 @@ class TrainingMonitor:
 
         # Generate outputs
         if output_dir is None:
-            output_dir = self.log_dir
+            output_dir = log_file.parent
 
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -489,7 +517,19 @@ def main():
     monitor = TrainingMonitor(args.log_dir)
 
     if args.mode == "monitor":
-        log_file = Path(args.log_dir) / "train.log"
+        log_file = monitor.find_train_log()
+        if log_file is None:
+            # In monitor mode, it's common to start the watcher before train.log is created.
+            # If the user provided a directory, fall back to <dir>/train.log and wait for it.
+            p = Path(args.log_dir)
+            if p.exists() and p.is_dir():
+                log_file = p / "train.log"
+            else:
+                logger.error(f"No train.log found under: {args.log_dir}")
+                logger.error(
+                    "Tip: pass a Hydra run directory (contains train.log), or a path to train.log directly."
+                )
+                sys.exit(1)
         monitor.monitor_realtime(log_file, alert_on_nan=args.alert_on_nan)
     else:
         monitor.analyze(output_dir=args.output)
